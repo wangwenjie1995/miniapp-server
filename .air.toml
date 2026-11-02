@@ -1,0 +1,31 @@
+# 开发热重载：运行 go tool air -c .air.toml。
+# 保存源码后重新编译并重启进程，内存中的数据不会保留。
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# 编译当前服务入口，产物放进已忽略的临时目录。
+cmd = "go build -o ./tmp/server ./cmd/server"
+bin = "./tmp/server"
+include_ext = ["go"]
+include_file = ["go.mod", "go.sum"]
+exclude_dir = ["tmp", "bin", ".git", "vendor"]
+exclude_regex = ["_test\\.go"]
+# 连续保存后等待 500ms 再构建，避免短时间内重复触发。
+delay = 500
+# 构建失败时停止旧服务，避免误以为新代码已经生效。
+stop_on_error = true
+# 重启前先发中断信号，允许服务完成优雅关闭，再释放端口。
+send_interrupt = true
+kill_delay = "12s"
+log = "build-errors.log"
+
+[log]
+time = true
+
+[misc]
+# 保留临时目录，方便查看构建错误；目录由 .gitignore 忽略。
+clean_on_exit = false
+
+[screen]
+clear_on_rebuild = false
