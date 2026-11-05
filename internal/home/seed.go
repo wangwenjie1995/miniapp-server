@@ -13,6 +13,8 @@ import (
 // 使用稳定主键/唯一键和 DoNothing，重复初始化不会重复插入或更新原记录。
 // 所有数据插入处于同一事务，一部分失败时全部回滚。
 func Seed(ctx context.Context, db *gorm.DB) error {
+	// WithContext(ctx) 将上下文传递给数据库操作，确保在操作过程中可以响应取消信号。
+	// WithContext不用可以吗？
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		entries := make([]Entry, 0)
 		for i, item := range seedFeatured() {
@@ -23,7 +25,7 @@ func Seed(ctx context.Context, db *gorm.DB) error {
 		}
 		if err := gorm.G[Entry](tx, clause.OnConflict{DoNothing: true}).CreateInBatches(ctx, &entries, 100); err != nil {
 			return err
-		}
+		} 
 		banners := make([]BannerRecord, 0)
 		for i, item := range seedBanners() {
 			banners = append(banners, BannerRecord{BannerKey: item.Key, Tone: item.Tone, SortOrder: i, Enabled: true})
