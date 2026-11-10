@@ -1,16 +1,19 @@
 package user
 
 import (
+	"errors"
 	"log/slog"
 	"miniapp-server/internal/response"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 type Handler struct {
 	service *Service
-	logger *slog.Logger
+	logger  *slog.Logger
 }
 
 func RegisterRoutes(api *gin.RouterGroup, service *Service, logger *slog.Logger) {
@@ -27,19 +30,55 @@ func RegisterRoutes(api *gin.RouterGroup, service *Service, logger *slog.Logger)
 func (h *Handler) register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_PARAMS", "注册参数错误")
+		response.Error(c, http.StatusBadRequest, "INVALID_PARAMS", registerValidationMessage(err))
 		return
 	}
 
 	user, err := h.service.CreateUser(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
+		if errors.Is(err, ErrUsernameExists) {
+			response.Error(c, http.StatusConflict, "USERNAME_EXISTS", "用户名已存在，请更换用户名")
+			return
+		}
 		h.logger.Error("用户注册失败", "error", err)
 		response.Error(c, http.StatusInternalServerError, "REGISTER_FAILED", "注册失败")
 		return
 	}
 
 	response.Success(c, UserResponse{
-		ID: user.ID,
+		ID:       user.ID,
 		Username: user.Username,
 	})
+}
+
+// registerValidationMessage 将校验错误转成用户可以理解的提示。
+func registerValidationMessage(err error) string {
+	var validationErrors validator.ValidationErrors
+	// errors.As(err, &validationErrors) 会检查 err 是否可以被转换为 validator.ValidationErrors 类型，
+	// 如果可以，则将其赋值给 validationErrors 变量。
+	// 如果不可以，则返回 false，表示 err 不是一个验证错误。
+	if !errors.As(err, &validationErrors) {
+		return "请求格式错误，请提交包含 username 和 password 的 JSON 对象"
+	}
+	var messages []string
+	for _, field := range validationErrors {
+		switch field.Field() {
+		case "Username":
+			if field.Tag() == "required" {
+				messages = append(messages, "请输入用户名")
+			} else {
+				messages = append(messages, "用户名长度须为 4 到 24 个字符")
+			}
+		case "Password":
+			if field.Tag() == "required" {
+				messages = append(messages, "请输入密码")
+			} else {
+				messages = append(messages, "密码长度须为 8 到 72 个字符")
+			}
+		}
+	}
+	if len(messages) == 0 {
+		return "注册参数不合法"
+	}
+	return strings.Join(messages, "；")
 }
