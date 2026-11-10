@@ -1,11 +1,10 @@
 package user
 
-import {
+import (
 	"context"
-	"time"
 
 	"gorm.io/gorm"
-}
+)
 
 type Repository interface {
 	CreateUser(ctx context.Context, username string, passwordHash string) (*User, error)
@@ -34,4 +33,11 @@ func (r *MySQLRepository) CreateUser(ctx context.Context, username string, passw
 }
 
 
-func
+func (r *MySQLRepository) FindUserByUsername(ctx context.Context, username string) (*User, error) {
+	user, err := gorm.G[User](r.db).Where("username = ?", username).First(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}

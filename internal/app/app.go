@@ -12,6 +12,7 @@ import (
 
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/home"
+	"miniapp-server/internal/user"
 )
 
 // App 保存服务运行所需的对象。字段小写开头，只能由本包直接访问。
@@ -21,9 +22,15 @@ type App struct {
 	logger *slog.Logger
 }
 
+type RouterDeps struct {
+	Logger    *slog.Logger
+	HomeRepository home.Repository
+	UserRepository user.Repository
+}
+
 // New 根据配置创建 App，但还没有监听端口。
 // *App 是指向 App 的指针，让后续方法操作同一个服务实例。
-func New(cfg config.Config, logger *slog.Logger, repository home.Repository) *App {
+func New(cfg config.Config, routerDep RouterDeps) *App {
 	// & 取得新对象的地址，这里同时构造 App 和内部的 http.Server。
 	return &App{
 		// 为啥用& &？
@@ -32,9 +39,9 @@ func New(cfg config.Config, logger *slog.Logger, repository home.Repository) *Ap
 			// 监听地址来自已经校验的配置，例如 :8080。
 			Addr: cfg.HTTPAddr,
 			// 把标准库 HTTP 服务内部的错误日志转交 slog，统一日志格式和输出位置。
-			ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelError),
+			ErrorLog: slog.NewLogLogger(routerDep.Logger.Handler(), slog.LevelError),
 			// Handler 是请求入口，每个请求交给这里创建的 Gin 路由处理。
-			Handler: NewRouter(logger, repository),
+			Handler: NewRouter(routerDep),
 			// 读取请求头的最长时间，避免客户端长时间占用连接却不发完整的头部。
 			ReadHeaderTimeout: 5 * time.Second,
 			// 读取整个请求（包含请求体）的最长时间。
@@ -44,7 +51,7 @@ func New(cfg config.Config, logger *slog.Logger, repository home.Repository) *Ap
 			// 一个长连接暂时没有请求时，最多等待 60 秒接收下一次请求。
 			IdleTimeout: 60 * time.Second,
 		},
-		logger: logger,
+		logger: routerDep.Logger,
 	}
 }
 

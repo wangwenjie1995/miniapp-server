@@ -4,8 +4,8 @@ import "time"
 
 type User struct {
 	ID uint64 `gorm:"primaryKey"`
-	Username string
-	PasswordHash string
+	Username string `gorm:"size:24;not null;uniqueIndex"`
+	PasswordHash string `gorm:"size:72;not null" json:"-"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

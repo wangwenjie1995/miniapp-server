@@ -16,6 +16,7 @@ import (
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
 	"miniapp-server/internal/home"
+	"miniapp-server/internal/user"
 )
 
 // main 是整个程序的入口，只负责设置运行模式、创建日志器，以及统一处理退出错误。
@@ -57,7 +58,12 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	deps := app.RouterDeps{
+		Logger:         logger,
+		HomeRepository: home.NewRepository(db),
+		UserRepository: user.NewRepository(db),
+	}
 	// HTTP 服务完成优雅关闭后，才释放数据库连接池。
 	defer pool.Close()
-	return app.New(cfg, logger, home.NewRepository(db)).Run(ctx)
+	return app.New(cfg, deps).Run(ctx)
 }
