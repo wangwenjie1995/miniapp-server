@@ -40,14 +40,20 @@ func fetchHome(t *testing.T, router *gin.Engine, path string, status int) homeRe
 	if recorder.Code != status {
 		t.Fatalf("%s: status=%d, want=%d, body=%s", path, recorder.Code, status, recorder.Body.String())
 	}
+	if status == http.StatusInternalServerError {
+		if recorder.Body.String() != "首页数据暂时无法获取" || recorder.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
+			t.Fatalf("unexpected server error: %s", recorder.Body.String())
+		}
+		return homeResponse{Message: recorder.Body.String()}
+	}
 	var result homeResponse
 	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Message == "" || len(result.Data) == 0 {
+	if result.Message == "" || (status == http.StatusOK && len(result.Data) == 0) {
 		t.Fatalf("%s: incomplete response: %s", path, recorder.Body.String())
 	}
-	if status == http.StatusOK && result.Code != 0 {
+	if (string(result.Data) == "null" && result.Code != 4000) || (string(result.Data) != "null" && result.Code != 0) {
 		t.Fatalf("%s: success code=%d", path, result.Code)
 	}
 	return result
@@ -148,15 +154,15 @@ func TestHomeNewsPagination(t *testing.T) {
 
 // TestHomeNewsInvalidQuery 确认非法输入明确失败，不会被悄悄当作成功数据。
 func TestHomeNewsInvalidQuery(t *testing.T) {
-	router := NewRouter(slog.New(slog.NewJSONHandler(io.Discard, nil)), emptyRepository{})
+	router := NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{}})
 	for _, query := range []string{
 		"tab=unknown", "page=0", "page=-1", "page=abc", "page=1.5",
 		"size=0", "size=-1", "size=101", "size=abc",
 		"page=99999999999999999999999999999",
 	} {
 		t.Run(query, func(t *testing.T) {
-			result := fetchHome(t, router, "/api/v1/home/news?"+query, http.StatusBadRequest)
-			if result.Code != 400 || string(result.Data) != "null" {
+			result := fetchHome(t, router, "/api/v1/home/news?"+query, http.StatusOK)
+			if result.Code != 4000 || result.Message == "" || string(result.Data) != "null" {
 				t.Fatalf("unexpected error body: %+v", result)
 			}
 		})
@@ -223,7 +229,7 @@ func newHomeDB(t *testing.T) *gorm.DB {
 
 func newHomeRouter(t *testing.T) *gin.Engine {
 	t.Helper()
-	return NewRouter(slog.New(slog.NewJSONHandler(io.Discard, nil)), home.NewRepository(newHomeDB(t)))
+	return NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: home.NewRepository(newHomeDB(t))})
 }
 
 // emptyRepository 用于不依赖 MySQL 的接口测试；正常服务不会使用这个测试对象。
@@ -252,10 +258,10 @@ func TestHomeEmptyAndDatabaseFailure(t *testing.T) {
 		{"failure", errors.New("private database details"), http.StatusInternalServerError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			router := NewRouter(slog.New(slog.NewJSONHandler(io.Discard, nil)), emptyRepository{err: tc.err})
+			router := NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{err: tc.err}})
 			for _, suffix := range []string{"", "/featured", "/tools", "/banners", "/flash", "/news"} {
 				body := fetchHome(t, router, "/api/v1/home"+suffix, tc.status)
-				if tc.err != nil && (body.Code != 500 || body.Message != "首页数据暂时无法获取" || string(body.Data) != "null") {
+				if tc.err != nil && (body.Message != "首页数据暂时无法获取" || len(body.Data) != 0) {
 					t.Fatalf("database errors must not leak or become success: %+v", body)
 				}
 				if tc.err == nil && suffix != "" && suffix != "/news" && string(body.Data) != "[]" {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log/slog"
 	"miniapp-server/internal/response"
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -20,8 +19,8 @@ func RegisterRoutes(api *gin.RouterGroup, service *Service, logger *slog.Logger)
 	h := &Handler{service: service, logger: logger}
 	group := api.Group("/user")
 	group.POST("/register", h.register)
+	group.POST("/login", h.login)
 }
-
 
 // 为啥是gin.Context，而不是context.Context？
 // gin.Context 是 Gin 框架提供的上下文对象，专门用于处理 HTTP 请求和响应。它封装了请求的详细信息（如请求头、请求体、URL 参数等）以及响应的相关方法（如设置状态码、写入响应体等）。
@@ -30,21 +29,43 @@ func RegisterRoutes(api *gin.RouterGroup, service *Service, logger *slog.Logger)
 func (h *Handler) register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_PARAMS", registerValidationMessage(err))
+		response.Error(c, response.CodeInvalidParams, registerValidationMessage(err))
 		return
 	}
 
 	user, err := h.service.CreateUser(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, ErrUsernameExists) {
-			response.Error(c, http.StatusConflict, "USERNAME_EXISTS", "用户名已存在，请更换用户名")
+			response.Error(c, response.CodeUsernameExists, "用户名已存在，请更换用户名")
 			return
 		}
 		h.logger.Error("用户注册失败", "error", err)
-		response.Error(c, http.StatusInternalServerError, "REGISTER_FAILED", "注册失败")
+		response.ServerError(c, "注册失败")
 		return
 	}
 
+	response.Success(c, UserResponse{
+		ID:       user.ID,
+		Username: user.Username,
+	})
+}
+func (h *Handler) login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, response.CodeInvalidParams, "请求参数错误")
+		return
+	}
+
+	user, err := h.service.VerifyCredentials(c.Request.Context(), req.Username, req.Password)
+	if err != nil {
+		if errors.Is(err, ErrInvalidCredentials) {
+			response.Error(c, response.CodeInvalidCredentials, "用户名或密码错误")
+			return
+		}
+		h.logger.Error("用户登录失败", "error", err)
+		response.ServerError(c, "登录失败，请稍后重试")
+		return
+	}
 	response.Success(c, UserResponse{
 		ID:       user.ID,
 		Username: user.Username,

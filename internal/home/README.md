@@ -48,7 +48,7 @@ curl 'http://localhost:8080/api/v1/home/news?tab=news&page=1&size=3'
 | page | 1 | 正整数，从 1 开始 |
 | size | 20 | 1 至 100 的整数 |
 
-省略参数或传入空字符串时，Gin 使用默认值。其他非法参数返回 HTTP 400，响应为 `{"code":400,"message":"参数错误：…","data":null}`。
+省略参数或传入空字符串时，Gin 使用默认值。其他非法参数返回 HTTP 200，响应为 `{"code":4000,"message":"参数错误：…","data":null}`。
 
 成功时外层 `data` 是分页对象：
 
@@ -92,6 +92,6 @@ curl http://localhost:8080/api/v1/home/banners
 curl http://localhost:8080/api/v1/home/flash
 ```
 
-查询错误返回 HTTP 500、`code:500`、通用说明和 `data:null`，不会伪装成空列表。空表正常查询返回空数组。聚合接口任何一个部分失败则整个请求失败；健康检查仍只表示 HTTP 可响应。
+查询错误返回 HTTP 500 和纯文本通用说明，不会伪装成空列表。空表正常查询返回空数组。聚合接口任何一个部分失败则整个请求失败；健康检查仍只表示 HTTP 可响应。
 
 路由测试位于 `internal/app/home_test.go`。普通测试覆盖参数和异常响应；设置 `MYSQL_INTEGRATION=1` 后使用独立测试库验证实际查询、分页、修改和重复初始化，详见项目 README。

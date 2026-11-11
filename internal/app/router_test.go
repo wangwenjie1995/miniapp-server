@@ -19,7 +19,7 @@ func TestHealthAndRecovery(t *testing.T) {
 	// bytes.Buffer 是内存缓冲区；将日志写到这里，测试就可以读取并检查内容。
 	var logs bytes.Buffer
 	// 复用生产代码的路由创建函数，测试实际安装的中间件和健康接口。
-	router := NewRouter(slog.New(slog.NewJSONHandler(&logs, nil)), nil)
+	router := NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(&logs, nil))})
 	// 这个故意 panic 的路由仅在当前测试实例中存在，不会暴露在正式服务里。
 	router.GET("/test-panic", func(c *gin.Context) { panic("test panic") })
 
@@ -31,7 +31,7 @@ func TestHealthAndRecovery(t *testing.T) {
 		body   string
 	}{
 		{"/healthz", http.StatusOK, `{"status":"ok"}`},
-		{"/test-panic", http.StatusInternalServerError, `{"code":"INTERNAL_ERROR","message":"服务内部错误"}`},
+		{"/test-panic", http.StatusInternalServerError, `服务内部错误`},
 		{"/healthz", http.StatusOK, `{"status":"ok"}`},
 	} {
 		// Recorder 模拟响应接收端，保存状态码、响应头和响应体供后续断言。
@@ -41,6 +41,12 @@ func TestHealthAndRecovery(t *testing.T) {
 		// 检查正常请求返回 200、异常请求返回 500。Fatalf 标记失败并停止测试。
 		if recorder.Code != tc.status {
 			t.Fatalf("%s: status = %d, want %d", tc.path, recorder.Code, tc.status)
+		}
+		if tc.status == http.StatusInternalServerError {
+			if recorder.Body.String() != tc.body || !strings.HasPrefix(recorder.Header().Get("Content-Type"), "text/plain") {
+				t.Fatalf("unexpected server error: %s", recorder.Body.String())
+			}
+			continue
 		}
 		// 将实际响应 got 和预期响应 want 都解码为 Go 数据，避免依赖 JSON 键的排列顺序。
 		var got, want any

@@ -3,7 +3,6 @@ package middleware
 
 import (
 	"log/slog"
-	"net/http"
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
@@ -34,8 +33,7 @@ func Recovery(logger *slog.Logger) gin.HandlerFunc {
 					return
 				}
 				// 响应尚未写出时，返回统一的 500 错误，不把内部异常细节暴露给客户端。
-				response.Error(c, http.StatusInternalServerError,
-					"INTERNAL_ERROR", "服务内部错误")
+				response.ServerError(c, "服务内部错误")
 			}
 		}()
 		// 执行后续处理链。发生 panic 时跳转到上面的 defer；

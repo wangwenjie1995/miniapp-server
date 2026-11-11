@@ -93,9 +93,9 @@ curl -i http://127.0.0.1:8081/healthz
 - `internal/middleware`：使用 `slog` 的 JSON 请求日志与异常恢复。
 - `internal/response`：JSON 响应工具。
 - `internal/home`：首页展示配置、快讯和分页资讯接口，通过 repository 查询 MySQL。
-- `internal/auth`、`internal/user`：业务模块职责预留。
+- `internal/user`：用户注册与登录凭据校验；`internal/auth`：认证模块职责预留。
 
-Gin 使用 `gin.New()` 创建，由标准库 `http.Server` 托管。请求日志包含方法、路径、状态码和耗时，不记录请求头、请求体及查询参数。异常恢复记录错误及堆栈；响应尚未写出时返回 HTTP 500 和 `{"code":"INTERNAL_ERROR","message":"服务内部错误"}`。如果响应已经写出，则终止当前处理，无法再改写状态码。
+Gin 使用 `gin.New()` 创建，由标准库 `http.Server` 托管。请求日志包含方法、路径、状态码和耗时，不记录请求头、请求体及查询参数。异常恢复记录错误及堆栈；响应尚未写出时返回 HTTP 500 和纯文本 `服务内部错误`。如果响应已经写出，则终止当前处理，无法再改写状态码。
 
 HTTP 超时：请求头 5 秒、读取 10 秒、写入 15 秒、空闲连接 60 秒。收到 Ctrl+C 或 SIGTERM 后最多等待 10 秒完成在途请求；超时则关闭连接并以非零退出码退出。配置错误、监听失败或服务错误同样以非零退出码退出。
 
@@ -141,8 +141,14 @@ curl http://localhost:8080/api/v1/home
 curl 'http://localhost:8080/api/v1/home/news?tab=news&page=1&size=3'
 ```
 
-参数、返回字段和示例见 [首页接口说明](internal/home/README.md)。首页成功响应使用 `{code:0,message:"success",data:...}`；健康检查和既有异常恢复响应格式保持原样。
+参数、返回字段和示例见 [首页接口说明](internal/home/README.md)。首页成功响应使用 `{code:0,message:"success",data:...}`；健康检查返回独立的状态信息。
 
 ## 后续扩展
 
-登录、用户模块尚未实现。本次只接入首页数据库，后续再确定登录凭证方案并实现登录及用户资料。
+用户模块已支持注册与登录凭据校验，登录成功返回用户 ID 和用户名，尚未签发 token 或建立会话。后续再实现登录凭证及用户资料功能。
+
+## 业务响应约定
+
+业务成功与业务失败均返回 HTTP 200，前端必须检查 JSON 的 `code`：`0` 成功、`4000` 参数错误、`5000` 用户名或密码错误、`5001` 用户名已存在。JSON 包含 `code/message/data`，失败时 `data` 为 `null`。
+
+数据库异常和未处理的 panic 返回 HTTP 500，响应体为纯文本通用提示，不包含 JSON 或内部错误详情。前端先检查 HTTP 状态，HTTP 200 再解析业务 JSON。健康检查 `/healthz` 维持独立的状态响应。

@@ -39,6 +39,7 @@ func Open(ctx context.Context, cfg config.Database) (*gorm.DB, *sql.DB, error) {
 	}
 	db, err := gorm.Open(mysql.New(mysql.Config{Conn: pool, SkipInitializeWithVersion: true}), &gorm.Config{
 		DisableAutomaticPing: true,
+		TranslateError:       true,
 		// SQL 错误由业务层统一写入 slog，避免 GORM 输出重复日志或 SQL 参数。
 		Logger: logger.Default.LogMode(logger.Silent),
 	})

@@ -3,14 +3,9 @@ package user
 import (
 	"context"
 	"errors"
-	"strings"
 
-	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 )
-
-// ErrUsernameExists 表示用户名与数据库中的记录冲突。
-var ErrUsernameExists = errors.New("用户名已存在")
 
 type Repository interface {
 	CreateUser(ctx context.Context, username string, passwordHash string) (*User, error)
@@ -33,10 +28,8 @@ func (r *MySQLRepository) CreateUser(ctx context.Context, username string, passw
 	err := gorm.G[User](r.db).Create(ctx, user)
 
 	if err != nil {
-		var mysqlErr *mysql.MySQLError
-
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 &&
-			(strings.HasSuffix(mysqlErr.Message, "for key 'users.username'")) {
+		// 当前 users 表的唯一业务字段是 username。
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return nil, ErrUsernameExists
 		}
 		return nil, err
