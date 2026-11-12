@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/home"
 	"miniapp-server/internal/user"
@@ -23,9 +24,10 @@ type App struct {
 }
 
 type RouterDeps struct {
-	Logger    *slog.Logger
+	Logger         *slog.Logger
 	HomeRepository home.Repository
 	UserRepository user.Repository
+	TokenManager   *auth.TokenManager
 }
 
 // New 根据配置创建 App，但还没有监听端口。

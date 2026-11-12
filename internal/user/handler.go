@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 	"log/slog"
+	"miniapp-server/internal/auth"
 	"miniapp-server/internal/response"
 	"strings"
 
@@ -11,12 +12,19 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	logger  *slog.Logger
+	service      *Service
+	logger       *slog.Logger
+	tokenManager *auth.TokenManager
 }
 
-func RegisterRoutes(api *gin.RouterGroup, service *Service, logger *slog.Logger) {
-	h := &Handler{service: service, logger: logger}
+type Dependencies struct {
+	Service      *Service
+	Logger       *slog.Logger
+	TokenManager *auth.TokenManager
+}
+
+func RegisterRoutes(api *gin.RouterGroup, deps Dependencies) {
+	h := &Handler{service: deps.Service, logger: deps.Logger, tokenManager: deps.TokenManager}
 	group := api.Group("/user")
 	group.POST("/register", h.register)
 	group.POST("/login", h.login)
@@ -66,9 +74,16 @@ func (h *Handler) login(c *gin.Context) {
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
-	response.Success(c, UserResponse{
-		ID:       user.ID,
-		Username: user.Username,
+	token, expiresAt, err := h.tokenManager.Generate(user.ID)
+	if err != nil {
+		h.logger.Error("生成token失败", "error", err)
+		response.ServerError(c, "登录失败，请稍后重试")
+		return
+	}
+	response.Success(c, LoginResponse{
+		UserResponse: UserResponse{ID: user.ID, Username: user.Username},
+		Token:        token,
+		ExpiresAt:    expiresAt,
 	})
 }
 

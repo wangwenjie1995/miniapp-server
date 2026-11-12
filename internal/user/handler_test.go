@@ -12,6 +12,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"miniapp-server/internal/auth"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -48,7 +51,10 @@ func TestRegisterResponses(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			router := gin.New()
-			RegisterRoutes(router.Group("/api/v1"), NewService(registrationRepo{tc.repoErr}), slog.New(slog.NewTextHandler(io.Discard, nil)))
+			RegisterRoutes(router.Group("/api/v1"), Dependencies{
+				Service: NewService(registrationRepo{tc.repoErr}),
+				Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+			})
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/user/register", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -111,7 +117,12 @@ func TestLoginResponses(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			router := gin.New()
-			RegisterRoutes(router.Group("/api/v1"), NewService(loginRepo{user: tc.user, err: tc.err}), slog.New(slog.NewTextHandler(io.Discard, nil)))
+			tokens := auth.NewTokenManager([]byte("test-only-secret-32-bytes-long!!"), time.Hour)
+			RegisterRoutes(router.Group("/api/v1"), Dependencies{
+				Service:      NewService(loginRepo{user: tc.user, err: tc.err}),
+				Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+				TokenManager: tokens,
+			})
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/user/login", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -126,10 +137,17 @@ func TestLoginResponses(t *testing.T) {
 				return
 			}
 			var body struct {
-				Code *int `json:"code"`
+				Code *int          `json:"code"`
+				Data LoginResponse `json:"data"`
 			}
 			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 				t.Fatal(err)
+			}
+			if tc.name == "success" {
+				id, err := tokens.Verify(body.Data.Token)
+				if err != nil || id != tc.user.ID || body.Data.ExpiresAt.Before(time.Now()) {
+					t.Fatalf("invalid login credentials: id=%d err=%v", id, err)
+				}
 			}
 			if body.Code == nil || *body.Code != tc.code {
 				t.Fatalf("unexpected business response: %s", w.Body.String())

@@ -13,22 +13,38 @@ import (
 )
 
 // NewRouter 返回 Gin 引擎。它实现 http.Handler 接口，可以直接交给 http.Server 使用。
-func NewRouter(routerDep RouterDeps) *gin.Engine {
+func NewRouter(deps RouterDeps) *gin.Engine {
 	// 创建不带默认日志和异常恢复中间件的引擎，由项目自己安装这些能力。
 	router := gin.New()
 	// Use 将中间件应用于所有路由。请求顺序：Logging → Recovery → 路由函数。
 	// 处理结束时逐层返回，因此外层 Logging 能记录异常恢复后的最终状态码。
-	router.Use(middleware.Logging(routerDep.Logger), middleware.Recovery(routerDep.Logger))
-	// 只有 GET /healthz 请求会进入这个函数。	GET 是方法，/healthz 是路径。
-	// *gin.Context 保存本次请求和响应信息，与传递取消信号的 context.Context 不同。
+	router.Use(
+		middleware.Logging(deps.Logger),
+		middleware.Recovery(deps.Logger),
+	)
+
+	// 健康检查保持公开，只检查服务能否响应，不检查数据库等外部依赖。
 	router.GET("/healthz", func(c *gin.Context) {
-		// http.StatusOK 就是 200。gin.H 是 map[string]any 的简写，序列化后是 JSON 对象。
-		// 该接口只检查服务能否响应，目前不检查数据库等外部依赖。
 		response.JSON(c, http.StatusOK, gin.H{"status": "ok"})
 	})
-	// 业务接口统一挂在 /api/v1 下，具体首页路由交给 home 模块登记。
-	home.RegisterRoutes(router.Group("/api/v1"), home.NewService(routerDep.HomeRepository), routerDep.Logger)
-	user.RegisterRoutes(router.Group("/api/v1"), user.NewService(routerDep.UserRepository), routerDep.Logger)
+
+	api := router.Group("/api/v1")
+
+	// 两个子组共用路径前缀，各自配置中间件；注册和登录保持公开。
+	public := api.Group("")
+	user.RegisterRoutes(public, user.Dependencies{
+		Service:      user.NewService(deps.UserRepository),
+		Logger:       deps.Logger,
+		TokenManager: deps.TokenManager,
+	})
+
+	// 鉴权只作用于此子组，首页接口需要有效的 Token。
+	protected := api.Group("", middleware.Auth(deps.TokenManager))
+	home.RegisterRoutes(protected, home.Dependencies{
+		Service: home.NewService(deps.HomeRepository),
+		Logger:  deps.Logger,
+	})
+
 	// 返回配置好的引擎；真正的端口监听在 App.Run 中执行。
 	return router
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"miniapp-server/internal/app"
+	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
 	"miniapp-server/internal/home"
@@ -58,10 +59,12 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	tokenManager := auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration)
 	deps := app.RouterDeps{
 		Logger:         logger,
 		HomeRepository: home.NewRepository(db),
 		UserRepository: user.NewRepository(db),
+		TokenManager:   tokenManager,
 	}
 	// HTTP 服务完成优雅关闭后，才释放数据库连接池。
 	defer pool.Close()

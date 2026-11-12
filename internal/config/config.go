@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -27,7 +28,13 @@ type Config struct {
 	// HTTPAddr 是监听地址，例如 :8080（所有本机网卡）或 127.0.0.1:8080（仅本机）。
 	HTTPAddr string
 	// DB 保存数据库连接参数；密码仅从本地私有文件或环境变量读取。
-	DB Database
+	DB  Database
+	JWT JWTConfig
+}
+
+type JWTConfig struct {
+	Secret   string
+	Duration time.Duration
 }
 
 // Database 是连接配置，不是数据库连接对象。
@@ -77,7 +84,19 @@ func Load() (Config, error) {
 	if strings.TrimSpace(db.Host) == "" || strings.TrimSpace(db.Name) == "" || strings.TrimSpace(db.User) == "" {
 		return Config{}, fmt.Errorf("DB_HOST、DB_NAME、DB_USER 不能为空")
 	}
-	return Config{HTTPAddr: addr, DB: db}, nil
+	secret := os.Getenv("JWT_SECRET")
+	if len(secret) < 32 {
+		return Config{}, fmt.Errorf("JWT_SECRET 至少需要 32 字节")
+	}
+
+	duration, err := time.ParseDuration(os.Getenv("JWT_DURATION"))
+	if err != nil || duration <= 0 {
+		return Config{}, fmt.Errorf("JWT_DURATION 必须是大于 0 的有效时长，例如 2h")
+	}
+	return Config{HTTPAddr: addr, DB: db, JWT: JWTConfig{
+		Secret:   secret,
+		Duration: duration,
+	}}, nil
 }
 
 // env 仅在变量未设置时使用默认值，不用默认值掩盖显式空配置。

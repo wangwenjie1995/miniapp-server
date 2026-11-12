@@ -13,13 +13,13 @@ type LoginRequest struct {
 }
 
 type UserResponse struct {
-	ID uint64 `json:"id"`
+	ID       uint64 `json:"id"`
 	Username string `json:"username"`
 }
 
-// expiresAt 是 token 的过期时间，前端可以根据这个时间判断是否需要刷新 token。
+// LoginResponse 保持用户字段平铺，并附带登录凭证及其过期时间。
 type LoginResponse struct {
-	Token string `json:"token"`
-	User UserResponse `json:"user"`
+	UserResponse
+	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }

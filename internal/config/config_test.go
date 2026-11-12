@@ -9,6 +9,8 @@ import (
 // Test 开头、接收 *testing.T 的函数会被 go test 自动执行。
 // 这个测试验证完全未设置 HTTP_ADDR 时使用默认值 :8080。
 func TestDefaultAddress(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-only-secret-32-bytes-long-000")
+	t.Setenv("JWT_DURATION", "2h")
 	// Setenv 会登记测试结束后的恢复操作，避免破坏运行测试前的环境变量。
 	t.Setenv("HTTP_ADDR", "")
 	// 删除环境变量，模拟“未设置”；它与显式设置为空字符串不同。
@@ -24,6 +26,8 @@ func TestDefaultAddress(t *testing.T) {
 
 // 表驱动测试：把多组输入及预期行为写成表，再逐项验证。
 func TestAddressConfiguration(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-only-secret-32-bytes-long-000")
+	t.Setenv("JWT_DURATION", "2h")
 	// range 遍历切片，_ 忽略序号，tc 是当前测试数据，valid 表示是否预期通过。
 	for _, tc := range []struct {
 		addr  string
@@ -57,6 +61,8 @@ func TestAddressConfiguration(t *testing.T) {
 
 // 数据库配置校验不需要连接数据库，验证显式错误不会被默认值覆盖。
 func TestDatabaseConfiguration(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-only-secret-32-bytes-long-000")
+	t.Setenv("JWT_DURATION", "2h")
 	for _, tc := range []struct{ key, value string }{
 		{"DB_PORT", "abc"}, {"DB_PORT", "0"}, {"DB_PORT", "65536"},
 		{"DB_HOST", ""}, {"DB_NAME", ""}, {"DB_USER", ""},
@@ -65,6 +71,35 @@ func TestDatabaseConfiguration(t *testing.T) {
 			t.Setenv(tc.key, tc.value)
 			if _, err := Load(); err == nil {
 				t.Fatal("invalid database configuration must fail")
+			}
+		})
+	}
+}
+
+func TestJWTConfiguration(t *testing.T) {
+	t.Setenv("HTTP_ADDR", ":8080")
+	t.Setenv("DB_HOST", "localhost")
+	t.Setenv("DB_PORT", "3306")
+	t.Setenv("DB_NAME", "test")
+	t.Setenv("DB_USER", "test")
+	for _, tc := range []struct {
+		name, secret, duration string
+		valid                  bool
+	}{
+		{"valid", "test-secret-at-least-32-bytes-long", "2h", true},
+		{"empty secret", "", "2h", false},
+		{"short secret", "short", "2h", false},
+		{"empty duration", "test-secret-at-least-32-bytes-long", "", false},
+		{"invalid duration", "test-secret-at-least-32-bytes-long", "abc", false},
+		{"zero duration", "test-secret-at-least-32-bytes-long", "0s", false},
+		{"negative duration", "test-secret-at-least-32-bytes-long", "-1h", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("JWT_SECRET", tc.secret)
+			t.Setenv("JWT_DURATION", tc.duration)
+			_, err := Load()
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%v err=%v", tc.valid, err)
 			}
 		})
 	}

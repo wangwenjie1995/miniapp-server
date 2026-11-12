@@ -1,6 +1,6 @@
 # 小程序 Go 后端
 
-基于 Go 1.25 和 Gin 的独立 HTTP 服务骨架，后续扩展登录、用户和首页能力。当前首页接口通过 GORM 泛型 API 读取本地 MySQL；登录、用户资料和 AI 功能尚未实现。
+基于 Go 1.25 和 Gin 的独立 HTTP 服务骨架，后续扩展登录、用户和首页能力。当前首页接口通过 GORM 泛型 API 读取本地 MySQL；已支持注册、登录及 JWT 鉴权，用户资料和 AI 功能尚未实现。
 
 ## 环境与启动
 
@@ -28,7 +28,11 @@ DB_PORT=3306
 DB_NAME=miniapp
 DB_USER=root
 DB_PASSWORD=你的本地密码
+JWT_SECRET=填写随机生成的密钥
+JWT_DURATION=2h
 ```
+
+使用 `openssl rand -hex 32` 生成 JWT 密钥并填入 `.env.local`。`JWT_SECRET` 至少 32 字节，`JWT_DURATION` 必须是正时长（例如 `2h`），两项均必填。
 
 密码包含 `#`、空格等字符时用引号包裹。不要提交或在聊天里发送真实密码。运行命令时应位于项目根目录。
 
@@ -93,7 +97,7 @@ curl -i http://127.0.0.1:8081/healthz
 - `internal/middleware`：使用 `slog` 的 JSON 请求日志与异常恢复。
 - `internal/response`：JSON 响应工具。
 - `internal/home`：首页展示配置、快讯和分页资讯接口，通过 repository 查询 MySQL。
-- `internal/user`：用户注册与登录凭据校验；`internal/auth`：认证模块职责预留。
+- `internal/user`：用户注册与登录凭据校验；`internal/auth`：JWT 签发与验证。
 
 Gin 使用 `gin.New()` 创建，由标准库 `http.Server` 托管。请求日志包含方法、路径、状态码和耗时，不记录请求头、请求体及查询参数。异常恢复记录错误及堆栈；响应尚未写出时返回 HTTP 500 和纯文本 `服务内部错误`。如果响应已经写出，则终止当前处理，无法再改写状态码。
 
@@ -134,7 +138,7 @@ HTTP_ADDR=invalid ./bin/server
 
 ## 首页接口
 
-首页接口位于 `/api/v1/home`，支持首屏聚合、特色入口、工具、轮播、快讯和分页资讯。全部为公开只读接口，运行时读取 MySQL；相邻 `uni-preset-vue-vite-ts` 前端已接入聚合和资讯分页接口。
+首页接口位于 `/api/v1/home`，支持首屏聚合、特色入口、工具、轮播、快讯和分页资讯。全部为需要 JWT 鉴权的只读接口，运行时读取 MySQL；相邻 `uni-preset-vue-vite-ts` 前端已接入聚合和资讯分页接口。
 
 ```sh
 curl http://localhost:8080/api/v1/home
@@ -145,7 +149,7 @@ curl 'http://localhost:8080/api/v1/home/news?tab=news&page=1&size=3'
 
 ## 后续扩展
 
-用户模块已支持注册与登录凭据校验，登录成功返回用户 ID 和用户名，尚未签发 token 或建立会话。后续再实现登录凭证及用户资料功能。
+注册和登录接口公开。登录成功返回用户 ID、用户名、`token` 和 `expiresAt`。访问首页接口时携带 `Authorization: Bearer <token>`；缺失、无效或过期的 Token 返回 HTTP 401。当前未实现刷新令牌和退出登录吊销。
 
 ## 业务响应约定
 

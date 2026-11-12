@@ -5,8 +5,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"miniapp-server/internal/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Handler 保存本模块需要的 Service 和日志器，不使用全局数据库变量。
@@ -15,10 +16,15 @@ type Handler struct {
 	logger  *slog.Logger
 }
 
+type Dependencies struct {
+	Service *Service
+	Logger  *slog.Logger
+}
+
 // RegisterRoutes 由总路由调用，把首页接口和数据库服务连接起来。
-// 现有六个 GET 接口保持公开，只读，不新增用户、登录或 AI 功能。
-func RegisterRoutes(api *gin.RouterGroup, service *Service, logger *slog.Logger) {
-	h := &Handler{service: service, logger: logger}
+// 六个 GET 接口均为只读；访问控制由传入路由组的中间件决定。
+func RegisterRoutes(api *gin.RouterGroup, deps Dependencies) {
+	h := &Handler{service: deps.Service, logger: deps.Logger}
 	group := api.Group("/home")
 	group.GET("", h.overview)
 	group.GET("/featured", h.featured)

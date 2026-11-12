@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"log/slog"
+	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
 	"miniapp-server/migrations"
@@ -36,7 +37,13 @@ type homeResponse struct {
 func fetchHome(t *testing.T, router *gin.Engine, path string, status int) homeResponse {
 	t.Helper()
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	token, _, err := homeTestTokens().Generate(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(recorder, req)
 	if recorder.Code != status {
 		t.Fatalf("%s: status=%d, want=%d, body=%s", path, recorder.Code, status, recorder.Body.String())
 	}
@@ -154,7 +161,7 @@ func TestHomeNewsPagination(t *testing.T) {
 
 // TestHomeNewsInvalidQuery 确认非法输入明确失败，不会被悄悄当作成功数据。
 func TestHomeNewsInvalidQuery(t *testing.T) {
-	router := NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{}})
+	router := NewRouter(RouterDeps{TokenManager: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{}})
 	for _, query := range []string{
 		"tab=unknown", "page=0", "page=-1", "page=abc", "page=1.5",
 		"size=0", "size=-1", "size=101", "size=abc",
@@ -229,7 +236,7 @@ func newHomeDB(t *testing.T) *gorm.DB {
 
 func newHomeRouter(t *testing.T) *gin.Engine {
 	t.Helper()
-	return NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: home.NewRepository(newHomeDB(t))})
+	return NewRouter(RouterDeps{TokenManager: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: home.NewRepository(newHomeDB(t))})
 }
 
 // emptyRepository 用于不依赖 MySQL 的接口测试；正常服务不会使用这个测试对象。
@@ -258,7 +265,7 @@ func TestHomeEmptyAndDatabaseFailure(t *testing.T) {
 		{"failure", errors.New("private database details"), http.StatusInternalServerError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			router := NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{err: tc.err}})
+			router := NewRouter(RouterDeps{TokenManager: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{err: tc.err}})
 			for _, suffix := range []string{"", "/featured", "/tools", "/banners", "/flash", "/news"} {
 				body := fetchHome(t, router, "/api/v1/home"+suffix, tc.status)
 				if tc.err != nil && (body.Message != "首页数据暂时无法获取" || len(body.Data) != 0) {
@@ -303,4 +310,8 @@ func TestHomeDatabaseChanges(t *testing.T) {
 	if _, err := repo.News(cancelled, home.NewsQuery{Tab: "news", Page: 1, Size: 20}); err == nil {
 		t.Fatal("cancelled request must fail")
 	}
+}
+
+func homeTestTokens() *auth.TokenManager {
+	return auth.NewTokenManager([]byte("home-test-secret-at-least-32-bytes"), time.Hour)
 }
