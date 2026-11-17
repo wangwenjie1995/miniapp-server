@@ -143,7 +143,7 @@ func (r *MySQLRepository) FindUserPermission(ctx context.Context, userID uint64)
 		select distinct
 			roles.id as role_id,
 			permissions.id as permission_id,
-			permissions.code as permission_code
+			permissions.code
 		from user_roles
 		join roles on roles.id = user_roles.role_id
 		join role_permissions on role_permissions.role_id = roles.id

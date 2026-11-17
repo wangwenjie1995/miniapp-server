@@ -65,9 +65,9 @@ func (s *Service) GetRoleAndPermissionCodes(ctx context.Context, userID uint64) 
 	permissionCodes := make([]string, 0, len(entries))
 	seen := make(map[string]bool)
 	for _, entry := range entries {
-		if !seen[entry.PermissionCode] {
-			seen[entry.PermissionCode] = true
-			permissionCodes = append(permissionCodes, entry.PermissionCode)
+		if !seen[entry.Code] {
+			seen[entry.Code] = true
+			permissionCodes = append(permissionCodes, entry.Code)
 		}
 	}
 	return roleCodes, permissionCodes, nil

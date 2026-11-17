@@ -18,7 +18,7 @@ type UserResponse struct {
 }
 type UserInfoResponse struct {
 	UserResponse
-	Roles []string `json:"roles"`
+	Roles       []string `json:"roles"`
 	Permissions []string `json:"permissions"`
 }
 
@@ -30,7 +30,7 @@ type LoginResponse struct {
 }
 
 type RolePermissionInfo struct {
-	RoleID         uint64
-	PermissionID   uint64
-	PermissionCode string
+	RoleID       uint64
+	PermissionID uint64
+	Code         string
 }

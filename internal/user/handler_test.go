@@ -46,7 +46,7 @@ func (permissionsRepo) FindActiveRoles(context.Context, uint64) ([]Role, error) 
 	return []Role{{Code: "admin"}, {Code: "user"}}, nil
 }
 func (permissionsRepo) FindUserPermission(context.Context, uint64) ([]RolePermissionInfo, error) {
-	return []RolePermissionInfo{{PermissionCode: "user:list"}, {PermissionCode: "user:list"}}, nil
+	return []RolePermissionInfo{{Code: "user:list"}, {Code: "user:list"}}, nil
 }
 
 func TestGetRoleAndPermissionCodes(t *testing.T) {
