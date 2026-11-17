@@ -4,7 +4,9 @@ import (
 	"errors"
 	"log/slog"
 	"miniapp-server/internal/auth"
+	"miniapp-server/internal/middleware"
 	"miniapp-server/internal/response"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +30,7 @@ func RegisterRoutes(api *gin.RouterGroup, deps Dependencies) {
 	group := api.Group("/user")
 	group.POST("/register", h.register)
 	group.POST("/login", h.login)
+	group.GET("/me", middleware.Auth(deps.TokenManager), h.getCurrentUser)
 }
 
 // 为啥是gin.Context，而不是context.Context？
@@ -80,11 +83,47 @@ func (h *Handler) login(c *gin.Context) {
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
+	roles, permissions, err := h.service.GetRoleAndPermissionCodes(c.Request.Context(), user.ID)
+	if err != nil {
+		h.logger.Error("获取用户角色和权限失败", "error", err)
+		response.ServerError(c, "登录失败，请稍后重试")
+		return
+	}
 	response.Success(c, LoginResponse{
-		UserResponse: UserResponse{ID: user.ID, Username: user.Username},
-		Token:        token,
-		ExpiresAt:    expiresAt,
+		UserInfoResponse: UserInfoResponse{
+			UserResponse: UserResponse{
+				ID:       user.ID,
+				Username: user.Username,
+			},
+			Roles:       roles,
+			Permissions: permissions,
+		},
+		Token:     token,
+		ExpiresAt: expiresAt,
 	})
+}
+
+func (h *Handler) getCurrentUser(c *gin.Context) {
+	// Auth 中间件验证 Token 后写入用户 ID。
+	userID, ok := middleware.GetUserIDFromContext(c)
+	if !ok {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.service.GetUserByID(c.Request.Context(), userID)
+
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			c.Abort()
+			c.String(http.StatusUnauthorized, "请先登录或重新登录")
+			return
+		}
+		h.logger.Error("获取用户信息失败", "error", err)
+		response.ServerError(c, "获取用户信息失败，请稍后重试")
+		return
+	}
+	response.Success(c, user)
 }
 
 // registerValidationMessage 将校验错误转成用户可以理解的提示。

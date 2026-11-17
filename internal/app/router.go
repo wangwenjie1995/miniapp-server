@@ -30,7 +30,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 
 	api := router.Group("/api/v1")
 
-	// 两个子组共用路径前缀，各自配置中间件；注册和登录保持公开。
+	// 注册、登录和首页接口均允许未登录访问。
 	public := api.Group("")
 	user.RegisterRoutes(public, user.Dependencies{
 		Service:      user.NewService(deps.UserRepository),
@@ -38,9 +38,8 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		TokenManager: deps.TokenManager,
 	})
 
-	// 鉴权只作用于此子组，首页接口需要有效的 Token。
-	protected := api.Group("", middleware.Auth(deps.TokenManager))
-	home.RegisterRoutes(protected, home.Dependencies{
+	// 首页不依赖用户身份，因此不校验请求中的 Token。
+	home.RegisterRoutes(public, home.Dependencies{
 		Service: home.NewService(deps.HomeRepository),
 		Logger:  deps.Logger,
 	})

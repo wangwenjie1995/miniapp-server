@@ -6,4 +6,5 @@ import "errors"
 var (
 	ErrUsernameExists     = errors.New("用户名已存在")
 	ErrInvalidCredentials = errors.New("用户名或密码错误")
+	ErrUserNotFound       = errors.New("用户不存在")
 )

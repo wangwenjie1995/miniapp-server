@@ -138,7 +138,7 @@ HTTP_ADDR=invalid ./bin/server
 
 ## 首页接口
 
-首页接口位于 `/api/v1/home`，支持首屏聚合、特色入口、工具、轮播、快讯和分页资讯。全部为需要 JWT 鉴权的只读接口，运行时读取 MySQL；相邻 `uni-preset-vue-vite-ts` 前端已接入聚合和资讯分页接口。
+首页接口位于 `/api/v1/home`，支持首屏聚合、特色入口、工具、轮播、快讯和分页资讯。全部为公开只读接口，运行时读取 MySQL；相邻 `uni-preset-vue-vite-ts` 前端已接入聚合和资讯分页接口。
 
 ```sh
 curl http://localhost:8080/api/v1/home
@@ -149,7 +149,7 @@ curl 'http://localhost:8080/api/v1/home/news?tab=news&page=1&size=3'
 
 ## 后续扩展
 
-注册和登录接口公开。登录成功返回用户 ID、用户名、`token` 和 `expiresAt`。访问首页接口时携带 `Authorization: Bearer <token>`；缺失、无效或过期的 Token 返回 HTTP 401。当前未实现刷新令牌和退出登录吊销。
+注册和登录接口公开。登录成功返回用户 ID、用户名、`token` 和 `expiresAt`。首页接口允许携带或不携带 `Authorization`，不校验 Token，也不读取登录身份。后续需要登录的接口可挂载 JWT 鉴权中间件。当前未实现刷新令牌和退出登录吊销。
 
 ## 业务响应约定
 

@@ -16,10 +16,21 @@ type UserResponse struct {
 	ID       uint64 `json:"id"`
 	Username string `json:"username"`
 }
+type UserInfoResponse struct {
+	UserResponse
+	Roles []string `json:"roles"`
+	Permissions []string `json:"permissions"`
+}
 
 // LoginResponse 保持用户字段平铺，并附带登录凭证及其过期时间。
 type LoginResponse struct {
-	UserResponse
+	UserInfoResponse
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+type RolePermissionInfo struct {
+	RoleID         uint64
+	PermissionID   uint64
+	PermissionCode string
 }

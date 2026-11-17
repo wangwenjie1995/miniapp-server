@@ -1,0 +1,86 @@
+{
+  "info": {
+    "name": "小程序 API",
+    "description": "启动本地服务后使用。先注册或使用已有账号登录；登录成功后自动保存 token。业务响应请检查 code，0 表示成功。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "用户",
+      "item": [
+        {
+          "name": "注册",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"testpass123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/user/register",
+            "description": "填写新用户名（4–24 字符）和密码（8–72 字符）。"
+          }
+        },
+        {
+          "name": "登录",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "pm.collectionVariables.unset('token');",
+              "try {",
+              "  const body = pm.response.json();",
+              "  if (pm.response.code === 200 && body.code === 0 && body.data && body.data.token) {",
+              "    pm.collectionVariables.set('token', body.data.token);",
+              "  }",
+              "} catch (e) { console.log('登录响应不是 JSON，未保存 token'); }"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"testpass123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/user/login",
+            "description": "填写已有账号；登录成功自动保存 token，失败时清除旧 token。"
+          }
+        },
+        {
+          "name": "当前用户",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "url": "{{baseUrl}}/api/v1/user/me",
+            "description": "先调用登录接口。此请求使用集合中的 token。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "首页（公开）",
+      "item": [
+        { "name": "首页聚合", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/home" } },
+        { "name": "特色入口", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/home/featured" } },
+        { "name": "工具入口", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/home/tools" } },
+        { "name": "轮播", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/home/banners" } },
+        { "name": "快讯", "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/home/flash" } },
+        {
+          "name": "资讯列表",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/home/news?tab=news&page=1&size=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "home", "news"],
+              "query": [
+                { "key": "tab", "value": "news", "description": "discover、news、flash、watchlist、journey" },
+                { "key": "page", "value": "1", "description": "正整数，从 1 开始" },
+                { "key": "size", "value": "3", "description": "每页数量，1–100" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    { "name": "健康检查", "request": { "method": "GET", "url": "{{baseUrl}}/healthz" } }
+  ]
+}

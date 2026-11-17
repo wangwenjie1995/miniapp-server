@@ -30,6 +30,31 @@ func (r registrationRepo) CreateUser(_ context.Context, username, hash string) (
 }
 
 func (registrationRepo) FindUserByUsername(context.Context, string) (*User, error) { return nil, nil }
+func (registrationRepo) FindUserByID(context.Context, uint64) (*User, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+func (registrationRepo) FindActiveRoles(context.Context, uint64) ([]Role, error) {
+	return []Role{{Code: "user"}}, nil
+}
+func (registrationRepo) FindUserPermission(context.Context, uint64) ([]RolePermissionInfo, error) {
+	return nil, nil
+}
+
+type permissionsRepo struct{ registrationRepo }
+
+func (permissionsRepo) FindActiveRoles(context.Context, uint64) ([]Role, error) {
+	return []Role{{Code: "admin"}, {Code: "user"}}, nil
+}
+func (permissionsRepo) FindUserPermission(context.Context, uint64) ([]RolePermissionInfo, error) {
+	return []RolePermissionInfo{{PermissionCode: "user:list"}, {PermissionCode: "user:list"}}, nil
+}
+
+func TestGetRoleAndPermissionCodes(t *testing.T) {
+	roles, permissions, err := NewService(permissionsRepo{}).GetRoleAndPermissionCodes(context.Background(), 1)
+	if err != nil || len(roles) != 2 || roles[0] != "admin" || roles[1] != "user" || len(permissions) != 1 || permissions[0] != "user:list" {
+		t.Fatalf("roles=%v permissions=%v err=%v", roles, permissions, err)
+	}
+}
 
 func TestRegisterResponses(t *testing.T) {
 	gin.SetMode(gin.TestMode)
