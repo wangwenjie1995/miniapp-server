@@ -10,6 +10,8 @@ type User struct {
 	PasswordHash string `gorm:"size:72;not null" json:"-"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+
+	Roles []Role `gorm:"many2many:user_roles;" json:"-"`
 }
 
 // 为啥要用users而不是user？
@@ -26,6 +28,9 @@ type Role struct {
 	IsBuiltin   uint8 // 0 自定义角色，1 系统内置角色
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+
+	Permissions []Permission `gorm:"many2many:role_permissions;"`
+	Users       []User       `gorm:"many2many:user_roles;" json:"-"`
 }
 
 func (Role) TableName() string { return "roles" }

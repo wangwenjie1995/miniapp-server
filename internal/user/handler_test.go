@@ -180,3 +180,59 @@ func TestLoginResponses(t *testing.T) {
 		})
 	}
 }
+
+func (registrationRepo) HasPermission(context.Context, uint64, string) (bool, error) {
+	return false, nil
+}
+
+func (registrationRepo) ListUsers(context.Context) ([]UserResponse, error) {
+	return []UserResponse{{ID: 1, Username: "alice"}}, nil
+}
+
+type listRepo struct {
+	registrationRepo
+	allowed bool
+}
+
+func (r listRepo) HasPermission(_ context.Context, id uint64, code string) (bool, error) {
+	return r.allowed && id == 42 && code == "user:list", r.err
+}
+
+func TestListUsersPermission(t *testing.T) {
+	tokens := auth.NewTokenManager([]byte("test-only-secret-32-bytes-long!!"), time.Hour)
+	token, _, err := tokens.Generate(42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		token  string
+		repo   listRepo
+		status int
+	}{
+		{"anonymous", "", listRepo{}, http.StatusUnauthorized},
+		{"denied", token, listRepo{}, http.StatusForbidden},
+		{"lookup failure", token, listRepo{registrationRepo: registrationRepo{err: errors.New("lookup failed")}}, http.StatusInternalServerError},
+		{"allowed", token, listRepo{allowed: true}, http.StatusOK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			router := gin.New()
+			RegisterRoutes(router.Group("/api/v1"), Dependencies{Service: NewService(tc.repo), TokenManager: tokens, UserRepository: tc.repo})
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/user/list", nil)
+			if tc.token != "" {
+				req.Header.Set("Authorization", "Bearer "+tc.token)
+			}
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != tc.status {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			if tc.status == http.StatusOK {
+				var result struct{ Data []UserResponse }
+				if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil || len(result.Data) != 1 || result.Data[0].Username != "alice" {
+					t.Fatalf("unexpected list response %s", w.Body.String())
+				}
+			}
+		})
+	}
+}

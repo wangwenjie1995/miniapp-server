@@ -33,9 +33,10 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	// 注册、登录和首页接口均允许未登录访问。
 	public := api.Group("")
 	user.RegisterRoutes(public, user.Dependencies{
-		Service:      user.NewService(deps.UserRepository),
-		Logger:       deps.Logger,
-		TokenManager: deps.TokenManager,
+		UserRepository: deps.UserRepository,
+		Service:        user.NewService(deps.UserRepository),
+		Logger:         deps.Logger,
+		TokenManager:   deps.TokenManager,
 	})
 
 	// 首页不依赖用户身份，因此不校验请求中的 Token。

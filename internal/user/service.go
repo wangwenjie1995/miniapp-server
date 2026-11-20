@@ -72,3 +72,7 @@ func (s *Service) GetRoleAndPermissionCodes(ctx context.Context, userID uint64) 
 	}
 	return roleCodes, permissionCodes, nil
 }
+
+func (s *Service) ListUsers(ctx context.Context) ([]UserResponse, error) {
+	return s.repo.ListUsers(ctx)
+}

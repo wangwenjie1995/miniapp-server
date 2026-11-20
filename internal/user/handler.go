@@ -20,9 +20,10 @@ type Handler struct {
 }
 
 type Dependencies struct {
-	Service      *Service
-	Logger       *slog.Logger
-	TokenManager *auth.TokenManager
+	UserRepository middleware.PermissionChecker
+	Service        *Service
+	Logger         *slog.Logger
+	TokenManager   *auth.TokenManager
 }
 
 func RegisterRoutes(api *gin.RouterGroup, deps Dependencies) {
@@ -30,7 +31,19 @@ func RegisterRoutes(api *gin.RouterGroup, deps Dependencies) {
 	group := api.Group("/user")
 	group.POST("/register", h.register)
 	group.POST("/login", h.login)
-	group.GET("/me", middleware.Auth(deps.TokenManager), h.getCurrentUser)
+	protected := group.Group("", middleware.Auth(deps.TokenManager))
+	protected.GET("/me", h.getCurrentUser)
+	protected.GET("/list", middleware.RequirePermission(deps.UserRepository, "user:list"), h.listUsers)
+}
+
+func (h *Handler) listUsers(c *gin.Context) {
+	users, err := h.service.ListUsers(c.Request.Context())
+	if err != nil {
+		h.logger.Error("获取用户列表失败", "error", err)
+		response.ServerError(c, "获取用户列表失败")
+		return
+	}
+	response.Success(c, users)
 }
 
 // 为啥是gin.Context，而不是context.Context？
