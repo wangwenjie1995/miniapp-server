@@ -1,11 +1,9 @@
-package user
+package user_test
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,8 +11,8 @@ import (
 	"time"
 
 	"miniapp-server/internal/auth"
+	"miniapp-server/internal/user"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -24,12 +22,12 @@ type currentUserRepo struct {
 	err   error
 }
 
-func (r *currentUserRepo) FindUserByID(_ context.Context, id uint64) (*User, error) {
+func (r *currentUserRepo) FindUserByID(_ context.Context, id uint64) (*user.User, error) {
 	r.gotID = id
 	if r.err != nil {
 		return nil, r.err
 	}
-	return &User{ID: id, Username: "alice", PasswordHash: "private-hash"}, nil
+	return &user.User{ID: id, Username: "alice", PasswordHash: "private-hash"}, nil
 }
 
 func TestGetCurrentUser(t *testing.T) {
@@ -57,8 +55,7 @@ func TestGetCurrentUser(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &currentUserRepo{err: tc.repoErr}
-			router := gin.New()
-			RegisterRoutes(router.Group("/api/v1"), Dependencies{Service: NewService(repo), Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), TokenManager: tokens})
+			router := newUserTestRouter(repo, tokens)
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/user/me", strings.NewReader(`{"id":99}`))
 			req.Header.Set("Authorization", tc.header)
 			w := httptest.NewRecorder()

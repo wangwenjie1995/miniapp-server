@@ -2,44 +2,30 @@ package user
 
 import (
 	"errors"
-	"log/slog"
-	"miniapp-server/internal/auth"
-	"miniapp-server/internal/middleware"
-	"miniapp-server/internal/response"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+
+	"miniapp-server/internal/middleware"
+	"miniapp-server/internal/platform"
+	"miniapp-server/internal/response"
 )
 
 type Handler struct {
-	service      *Service
-	logger       *slog.Logger
-	tokenManager *auth.TokenManager
+	service   *Service
+	resources platform.Resources
 }
 
-type Dependencies struct {
-	UserRepository middleware.PermissionChecker
-	Service        *Service
-	Logger         *slog.Logger
-	TokenManager   *auth.TokenManager
+func NewHandler(service *Service, resources platform.Resources) *Handler {
+	return &Handler{service: service, resources: resources}
 }
 
-func RegisterRoutes(api *gin.RouterGroup, deps Dependencies) {
-	h := &Handler{service: deps.Service, logger: deps.Logger, tokenManager: deps.TokenManager}
-	group := api.Group("/user")
-	group.POST("/register", h.register)
-	group.POST("/login", h.login)
-	protected := group.Group("", middleware.Auth(deps.TokenManager))
-	protected.GET("/me", h.getCurrentUser)
-	protected.GET("/list", middleware.RequirePermission(deps.UserRepository, "user:list"), h.listUsers)
-}
-
-func (h *Handler) listUsers(c *gin.Context) {
+func (h *Handler) ListUsers(c *gin.Context) {
 	users, err := h.service.ListUsers(c.Request.Context())
 	if err != nil {
-		h.logger.Error("获取用户列表失败", "error", err)
+		h.resources.Log().Error("获取用户列表失败", "error", err)
 		response.ServerError(c, "获取用户列表失败")
 		return
 	}
@@ -50,7 +36,7 @@ func (h *Handler) listUsers(c *gin.Context) {
 // gin.Context 是 Gin 框架提供的上下文对象，专门用于处理 HTTP 请求和响应。它封装了请求的详细信息（如请求头、请求体、URL 参数等）以及响应的相关方法（如设置状态码、写入响应体等）。
 // context.Context 是 Go 标准库提供的上下文对象，主要用于在不同函数之间传递取消信号、截止时间和其他请求范围的数据。它不包含 HTTP 请求和响应的具体信息。
 // 在处理 HTTP 请求时，使用 gin.Context 可以方便地访问请求数据和发送响应，而 context.Context 更适合用于控制函数执行的生命周期和传递跨 API 的数据。因此，在 Gin 的处理函数中，通常会使用 gin.Context 来处理 HTTP 请求。
-func (h *Handler) register(c *gin.Context) {
+func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeInvalidParams, registerValidationMessage(err))
@@ -63,7 +49,7 @@ func (h *Handler) register(c *gin.Context) {
 			response.Error(c, response.CodeUsernameExists, "用户名已存在，请更换用户名")
 			return
 		}
-		h.logger.Error("用户注册失败", "error", err)
+		h.resources.Log().Error("用户注册失败", "error", err)
 		response.ServerError(c, "注册失败")
 		return
 	}
@@ -73,7 +59,7 @@ func (h *Handler) register(c *gin.Context) {
 		Username: user.Username,
 	})
 }
-func (h *Handler) login(c *gin.Context) {
+func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeInvalidParams, "请求参数错误")
@@ -86,19 +72,25 @@ func (h *Handler) login(c *gin.Context) {
 			response.Error(c, response.CodeInvalidCredentials, "用户名或密码错误")
 			return
 		}
-		h.logger.Error("用户登录失败", "error", err)
+		h.resources.Log().Error("用户登录失败", "error", err)
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
-	token, expiresAt, err := h.tokenManager.Generate(user.ID)
+	tokens := h.resources.Tokens
+	if tokens == nil {
+		h.resources.Log().Error("未配置 Token 管理器")
+		response.ServerError(c, "登录失败，请稍后重试")
+		return
+	}
+	token, expiresAt, err := tokens.Generate(user.ID)
 	if err != nil {
-		h.logger.Error("生成token失败", "error", err)
+		h.resources.Log().Error("生成token失败", "error", err)
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
 	roles, permissions, err := h.service.GetRoleAndPermissionCodes(c.Request.Context(), user.ID)
 	if err != nil {
-		h.logger.Error("获取用户角色和权限失败", "error", err)
+		h.resources.Log().Error("获取用户角色和权限失败", "error", err)
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
@@ -116,7 +108,7 @@ func (h *Handler) login(c *gin.Context) {
 	})
 }
 
-func (h *Handler) getCurrentUser(c *gin.Context) {
+func (h *Handler) GetCurrentUser(c *gin.Context) {
 	// Auth 中间件验证 Token 后写入用户 ID。
 	userID, ok := middleware.GetUserIDFromContext(c)
 	if !ok {
@@ -132,7 +124,7 @@ func (h *Handler) getCurrentUser(c *gin.Context) {
 			c.String(http.StatusUnauthorized, "请先登录或重新登录")
 			return
 		}
-		h.logger.Error("获取用户信息失败", "error", err)
+		h.resources.Log().Error("获取用户信息失败", "error", err)
 		response.ServerError(c, "获取用户信息失败，请稍后重试")
 		return
 	}

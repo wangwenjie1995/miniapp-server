@@ -1,4 +1,4 @@
-package app
+package router_test
 
 import (
 	"context"
@@ -16,6 +16,8 @@ import (
 	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
+	"miniapp-server/internal/platform"
+	"miniapp-server/internal/router"
 	"miniapp-server/migrations"
 	"net/http"
 	"net/http/httptest"
@@ -161,7 +163,7 @@ func TestHomeNewsPagination(t *testing.T) {
 
 // TestHomeNewsInvalidQuery 确认非法输入明确失败，不会被悄悄当作成功数据。
 func TestHomeNewsInvalidQuery(t *testing.T) {
-	router := NewRouter(RouterDeps{TokenManager: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{}})
+	router := router.NewWithDependencies(platform.Resources{Tokens: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil))}, router.Repositories{Home: emptyRepository{}})
 	for _, query := range []string{
 		"tab=unknown", "page=0", "page=-1", "page=abc", "page=1.5",
 		"size=0", "size=-1", "size=101", "size=abc",
@@ -236,7 +238,7 @@ func newHomeDB(t *testing.T) *gorm.DB {
 
 func newHomeRouter(t *testing.T) *gin.Engine {
 	t.Helper()
-	return NewRouter(RouterDeps{TokenManager: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: home.NewRepository(newHomeDB(t))})
+	return router.NewWithDependencies(platform.Resources{Tokens: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil))}, router.Repositories{Home: home.NewRepository(newHomeDB(t))})
 }
 
 // emptyRepository 用于不依赖 MySQL 的接口测试；正常服务不会使用这个测试对象。
@@ -265,7 +267,7 @@ func TestHomeEmptyAndDatabaseFailure(t *testing.T) {
 		{"failure", errors.New("private database details"), http.StatusInternalServerError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			router := NewRouter(RouterDeps{TokenManager: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), HomeRepository: emptyRepository{err: tc.err}})
+			router := router.NewWithDependencies(platform.Resources{Tokens: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil))}, router.Repositories{Home: emptyRepository{err: tc.err}})
 			for _, suffix := range []string{"", "/featured", "/tools", "/banners", "/flash", "/news"} {
 				body := fetchHome(t, router, "/api/v1/home"+suffix, tc.status)
 				if tc.err != nil && (body.Message != "首页数据暂时无法获取" || len(body.Data) != 0) {

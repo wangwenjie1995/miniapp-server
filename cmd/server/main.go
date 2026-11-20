@@ -16,8 +16,8 @@ import (
 	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
-	"miniapp-server/internal/home"
-	"miniapp-server/internal/user"
+	"miniapp-server/internal/platform"
+	"miniapp-server/internal/router"
 )
 
 // main 是整个程序的入口，只负责设置运行模式、创建日志器，以及统一处理退出错误。
@@ -26,20 +26,19 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	// slog 是 Go 标准库的日志工具。JSONHandler 把日志转成 JSON，便于程序检索。
 	// os.Stdout 表示输出到终端；nil 表示使用默认选项，默认记录 INFO 及以上级别。
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	// Go 通常通过返回 error 表示失败。nil 表示没有错误，非 nil 表示需要处理。
 	// 这里的 err 只在这个 if 语句及其代码块中有效。
-	if err := run(logger); err != nil {
-		logger.Error("服务退出", "error", err)
+	if err := run(); err != nil {
+		slog.Error("服务退出", "error", err)
 		// 退出码 1 表示失败，方便终端或部署系统识别；正常执行完 main 则退出码为 0。
 		// os.Exit 不执行 defer，所以资源清理放在 run 中，返回这里之前完成。
 		os.Exit(1)
 	}
 }
 
-// run 串起启动流程，并在服务运行期间等待。*slog.Logger 表示传入日志器的指针，
-// 各模块使用同一个日志器；返回 error 让 main 统一记录失败。
-func run(logger *slog.Logger) error {
+// run 初始化共享资源，然后运行 HTTP 服务。
+func run() error {
 	// 第一步：读取并校验配置。配置错误时直接返回，不继续启动服务。
 	cfg, err := config.Load()
 	if err != nil {
@@ -50,8 +49,6 @@ func run(logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	// defer 表示在当前函数返回时调用；stop 用于释放信号监听相关资源。
 	defer stop()
-	// 第三步：New 组装服务但不监听端口；Run 才启动服务，并等待错误或退出信号。
-	// app 是 miniapp-server 的核心模块，负责组装路由、注册中间件、启动 HTTP 服务。
 	// 在开始监听 HTTP 前检查 MySQL；连接失败则退出，不回退到固定数据。
 	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -59,14 +56,9 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	tokenManager := auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration)
-	deps := app.RouterDeps{
-		Logger:         logger,
-		HomeRepository: home.NewRepository(db),
-		UserRepository: user.NewRepository(db),
-		TokenManager:   tokenManager,
-	}
 	// HTTP 服务完成优雅关闭后，才释放数据库连接池。
 	defer pool.Close()
-	return app.New(cfg, deps).Run(ctx)
+	tokens := auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration)
+	handler := router.New(platform.Resources{DB: db, Tokens: tokens})
+	return app.New(cfg.HTTPAddr, handler).Run(ctx)
 }

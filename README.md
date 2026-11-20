@@ -90,7 +90,9 @@ curl -i http://127.0.0.1:8081/healthz
 ## 项目组织
 
 - `cmd/server`：启动入口、信号监听和退出码。
-- `internal/app`：Gin 路由、HTTP 服务和优雅关闭。
+- `internal/app`：HTTP 服务启动和优雅关闭。
+- `internal/router`：集中注册 Gin 路由、划分路由组并绑定中间件。
+- `internal/platform` 保存共享资源定义，启动时创建 DB 和 Token 管理器，组装模块时统一传入。
 - `internal/config`：环境变量、本地私有配置读取及校验。
 - `internal/database`：MySQL 连接池、GORM 初始化和启动连接检查。
 - `migrations`、`cmd/dbinit`：首页版本化 SQL 迁移及显式初始化命令。
@@ -116,7 +118,7 @@ go build ./...
 真实 MySQL 集成测试显式启用：
 
 ```sh
-MYSQL_INTEGRATION=1 go test ./internal/app -v
+MYSQL_INTEGRATION=1 go test ./internal/router -v
 ```
 
 集成测试读取 `.env.local`，使用同一账号创建名称为 `miniapp_test_时间戳` 的独立临时库并在完成后删除。账号需要创建、删除测试库权限。测试不会清空业务库，覆盖六个首页接口、五栏目分页、重复迁移与导入、数据修改保留、发布过滤和取消查询。未启用时相关集成用例会显示 SKIP，不代表已完成真实 MySQL 验证。

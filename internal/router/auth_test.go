@@ -1,4 +1,4 @@
-package app
+package router_test
 
 import (
 	"io"
@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"miniapp-server/internal/platform"
+	"miniapp-server/internal/router"
 )
 
 func TestPublicRoutes(t *testing.T) {
-	router := NewRouter(RouterDeps{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), TokenManager: homeTestTokens(), HomeRepository: emptyRepository{}})
+	router := router.NewWithDependencies(platform.Resources{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Tokens: homeTestTokens()}, router.Repositories{Home: emptyRepository{}})
 	for _, tc := range []struct {
 		method, path string
 		status       int

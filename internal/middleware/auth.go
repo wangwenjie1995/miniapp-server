@@ -22,7 +22,7 @@ func GetUserIDFromContext(c *gin.Context) (uint64, bool) {
 	return userID, ok && userID != 0
 }
 
-func Auth(tokenManager *auth.TokenManager) gin.HandlerFunc {
+func Auth(tokens *auth.TokenManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 
@@ -41,7 +41,11 @@ func Auth(tokenManager *auth.TokenManager) gin.HandlerFunc {
 
 		token := parts[1]
 
-		userID, err := tokenManager.Verify(token)
+		if tokens == nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		userID, err := tokens.Verify(token)
 
 		if err != nil {
 			c.Abort()

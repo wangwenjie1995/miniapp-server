@@ -11,6 +11,9 @@ import (
 // Logging 接收日志器，返回一个 Gin 中间件。
 // 外层函数在注册时执行，返回的内部函数在每次请求时执行。
 func Logging(logger *slog.Logger) gin.HandlerFunc {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	// c 是当前请求的上下文，用来访问请求数据和响应状态。
 	return func(c *gin.Context) {
 		// 在进入处理链时记录起点，后面计算本次请求的总处理耗时。

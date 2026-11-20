@@ -1,5 +1,5 @@
 // 本测试直接调用 Gin 引擎，不占用真实网络端口。
-package app
+package router_test
 
 import (
 	"bytes"
@@ -12,6 +12,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"miniapp-server/internal/platform"
+	"miniapp-server/internal/router"
 )
 
 // 一起验证健康检查、panic 恢复和日志，确保请求处理链能正常配合。
@@ -19,7 +22,7 @@ func TestHealthAndRecovery(t *testing.T) {
 	// bytes.Buffer 是内存缓冲区；将日志写到这里，测试就可以读取并检查内容。
 	var logs bytes.Buffer
 	// 复用生产代码的路由创建函数，测试实际安装的中间件和健康接口。
-	router := NewRouter(RouterDeps{Logger: slog.New(slog.NewJSONHandler(&logs, nil))})
+	router := router.NewWithDependencies(platform.Resources{Logger: slog.New(slog.NewJSONHandler(&logs, nil))}, router.Repositories{})
 	// 这个故意 panic 的路由仅在当前测试实例中存在，不会暴露在正式服务里。
 	router.GET("/test-panic", func(c *gin.Context) { panic("test panic") })
 
