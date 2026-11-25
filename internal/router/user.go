@@ -1,15 +1,25 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
+
+	"miniapp-server/internal/middleware"
+	"miniapp-server/internal/platform"
 	"miniapp-server/internal/user"
 )
 
-func registerUser(routes groups, h *user.Handler) {
-	public := routes.public.Group("/user")
-	public.POST("/register", h.Register)
-	public.POST("/login", h.Login)
+func initUserRoutes(publicGroup, authenticatedGroup *gin.RouterGroup, resources platform.Resources) {
+	repo := user.NewRepository(resources.DB)
+	handler := user.NewHandler(repo, resources.Log(), resources.Tokens)
+	RegisterUserRoutes(publicGroup, authenticatedGroup, handler, repo)
+}
 
-	protected := routes.authenticated.Group("/user")
-	protected.GET("/me", h.GetCurrentUser)
-	protected.GET("/list", routes.require("user:list"), h.ListUsers)
+func RegisterUserRoutes(publicGroup, authenticatedGroup *gin.RouterGroup, handler *user.Handler, checker middleware.PermissionChecker) {
+	public := publicGroup.Group("/user")
+	public.POST("/register", handler.Register)
+	public.POST("/login", handler.Login)
+
+	protected := authenticatedGroup.Group("/user")
+	protected.GET("/me", handler.GetCurrentUser)
+	protected.GET("/list", middleware.RequirePermission(checker, "user:list"), handler.ListUsers)
 }

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"miniapp-server/internal/auth"
-	"miniapp-server/internal/platform"
+	"miniapp-server/internal/middleware"
 	"miniapp-server/internal/router"
 	"miniapp-server/internal/user"
 
@@ -26,7 +26,13 @@ import (
 type registrationRepo struct{ err error }
 
 func newUserTestRouter(repo user.Repository, tokens *auth.TokenManager) *gin.Engine {
-	return router.NewWithDependencies(platform.Resources{Tokens: tokens, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}, router.Repositories{User: repo})
+	engine := gin.New()
+	v1 := engine.Group("/api/v1")
+	handler := user.NewHandler(repo, slog.New(slog.NewTextHandler(io.Discard, nil)), tokens)
+	authenticatedGroup := v1.Group("")
+	authenticatedGroup.Use(middleware.Auth(tokens))
+	router.RegisterUserRoutes(v1, authenticatedGroup, handler, repo)
+	return engine
 }
 
 func (r registrationRepo) CreateUser(_ context.Context, username, hash string) (*user.User, error) {
@@ -59,7 +65,7 @@ func (permissionsRepo) FindUserPermission(context.Context, uint64) ([]user.RoleP
 }
 
 func TestGetRoleAndPermissionCodes(t *testing.T) {
-	roles, permissions, err := user.NewService(permissionsRepo{}).GetRoleAndPermissionCodes(context.Background(), 1)
+	roles, permissions, err := user.GetRoleAndPermissionCodes(context.Background(), permissionsRepo{}, 1)
 	if err != nil || len(roles) != 2 || roles[0] != "admin" || roles[1] != "user" || len(permissions) != 1 || permissions[0] != "user:list" {
 		t.Fatalf("roles=%v permissions=%v err=%v", roles, permissions, err)
 	}

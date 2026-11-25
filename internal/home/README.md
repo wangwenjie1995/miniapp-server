@@ -74,8 +74,8 @@ curl 'http://localhost:8080/api/v1/home/news?tab=news&page=1&size=3'
 ## 调用和阅读顺序
 
 ```text
-router/router.go 注册 /api/v1
-    → router/home.go 注册首页路由
+router/router.go 的 registerModuleRoutes 创建 /api/v1 路由组
+    → router/home.go 的 RegisterHomeRoutes 注册首页路由
     → home/handler.go 校验参数、返回响应
     → home/service.go 组装首屏内容
     → home/repository.go 使用 gorm.G[类型] 查询 MySQL
@@ -95,4 +95,4 @@ curl http://localhost:8080/api/v1/home/flash
 
 查询错误返回 HTTP 500 和纯文本通用说明，不会伪装成空列表。空表正常查询返回空数组。聚合接口任何一个部分失败则整个请求失败；健康检查仍只表示 HTTP 可响应。
 
-路由测试位于 `internal/router/home_test.go`。普通测试覆盖参数和异常响应；设置 `MYSQL_INTEGRATION=1` 后使用独立测试库验证实际查询、分页、修改和重复初始化，详见项目 README。
+路由测试位于 `tests/router/home_test.go`。普通测试覆盖参数和异常响应；设置 `MYSQL_INTEGRATION=1` 后使用独立测试库验证实际查询、分页、修改和重复初始化，详见项目 README。

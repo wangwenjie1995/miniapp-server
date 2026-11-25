@@ -7,12 +7,25 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+
 	"miniapp-server/internal/platform"
 	"miniapp-server/internal/router"
 )
 
 func TestPublicRoutes(t *testing.T) {
-	router := router.NewWithDependencies(platform.Resources{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Tokens: homeTestTokens()}, router.Repositories{Home: emptyRepository{}})
+	// 用空查询结果验证真实路由的鉴权链，无需连接 MySQL。
+	db, err := gorm.Open(mysql.New(mysql.Config{SkipInitializeWithVersion: true}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pool.Close() })
+	router := router.New(platform.Resources{DB: db, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Tokens: homeTestTokens()})
 	for _, tc := range []struct {
 		method, path string
 		status       int

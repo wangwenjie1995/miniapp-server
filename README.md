@@ -118,7 +118,7 @@ go build ./...
 真实 MySQL 集成测试显式启用：
 
 ```sh
-MYSQL_INTEGRATION=1 go test ./internal/router -v
+MYSQL_INTEGRATION=1 go test ./tests/router -v
 ```
 
 集成测试读取 `.env.local`，使用同一账号创建名称为 `miniapp_test_时间戳` 的独立临时库并在完成后删除。账号需要创建、删除测试库权限。测试不会清空业务库，覆盖六个首页接口、五栏目分页、重复迁移与导入、数据修改保留、发布过滤和取消查询。未启用时相关集成用例会显示 SKIP，不代表已完成真实 MySQL 验证。

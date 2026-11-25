@@ -58,7 +58,10 @@ func run() error {
 	}
 	// HTTP 服务完成优雅关闭后，才释放数据库连接池。
 	defer pool.Close()
-	tokens := auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration)
-	handler := router.New(platform.Resources{DB: db, Tokens: tokens})
+	resources := platform.Resources{
+		DB:     db,
+		Tokens: auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration),
+	}
+	handler := router.New(resources)
 	return app.New(cfg.HTTPAddr, handler).Run(ctx)
 }

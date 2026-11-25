@@ -1,9 +1,11 @@
 // _test.go 文件仅在 go test 时用于测试，不参与业务服务的启动流程。
-package config
+package config_test
 
 import (
 	"os"
 	"testing"
+
+	"miniapp-server/internal/config"
 )
 
 // Test 开头、接收 *testing.T 的函数会被 go test 自动执行。
@@ -18,7 +20,7 @@ func TestDefaultAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 调用真实配置函数；t.Fatal 或 t.Fatalf 会标记失败并停止当前测试。
-	cfg, err := Load()
+	cfg, err := config.Load()
 	if err != nil || cfg.HTTPAddr != ":8080" {
 		t.Fatalf("Load() = %+v, %v", cfg, err)
 	}
@@ -46,7 +48,7 @@ func TestAddressConfiguration(t *testing.T) {
 		t.Run(tc.addr, func(t *testing.T) {
 			t.Setenv("HTTP_ADDR", tc.addr)
 			// 调用真实配置函数；t.Fatal 或 t.Fatalf 会标记失败并停止当前测试。
-			cfg, err := Load()
+			cfg, err := config.Load()
 			// err == nil 表示实际成功；如果与预期 valid 不一致，则测试失败。
 			if (err == nil) != tc.valid {
 				t.Fatalf("Load() = %+v, %v", cfg, err)
@@ -69,7 +71,7 @@ func TestDatabaseConfiguration(t *testing.T) {
 	} {
 		t.Run(tc.key+tc.value, func(t *testing.T) {
 			t.Setenv(tc.key, tc.value)
-			if _, err := Load(); err == nil {
+			if _, err := config.Load(); err == nil {
 				t.Fatal("invalid database configuration must fail")
 			}
 		})
@@ -97,7 +99,7 @@ func TestJWTConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("JWT_SECRET", tc.secret)
 			t.Setenv("JWT_DURATION", tc.duration)
-			_, err := Load()
+			_, err := config.Load()
 			if (err == nil) != tc.valid {
 				t.Fatalf("valid=%v err=%v", tc.valid, err)
 			}

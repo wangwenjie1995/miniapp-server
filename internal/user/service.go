@@ -9,19 +9,13 @@ import (
 	"gorm.io/gorm"
 )
 
-type Service struct{ repo Repository }
-
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
-}
-
-func (s *Service) CreateUser(ctx context.Context, username string, password string) (*User, error) {
+func createUser(ctx context.Context, repo Repository, username string, password string) (*User, error) {
 	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-	return s.repo.CreateUser(ctx, username, passwordHash)
+	return repo.CreateUser(ctx, username, passwordHash)
 }
 
-func (s *Service) VerifyCredentials(ctx context.Context, username string, password string) (*User, error) {
-	user, err := s.repo.FindUserByUsername(ctx, username)
+func verifyCredentials(ctx context.Context, repo Repository, username string, password string) (*User, error) {
+	user, err := repo.FindUserByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrInvalidCredentials
@@ -35,8 +29,8 @@ func (s *Service) VerifyCredentials(ctx context.Context, username string, passwo
 	return user, nil
 }
 
-func (s *Service) GetUserByID(ctx context.Context, id uint64) (*User, error) {
-	user, err := s.repo.FindUserByID(ctx, id)
+func getUserByID(ctx context.Context, repo Repository, id uint64) (*User, error) {
+	user, err := repo.FindUserByID(ctx, id)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -49,12 +43,12 @@ func (s *Service) GetUserByID(ctx context.Context, id uint64) (*User, error) {
 }
 
 // GetRoleAndPermissionCodes 返回启用角色和去重后的权限编码。
-func (s *Service) GetRoleAndPermissionCodes(ctx context.Context, userID uint64) ([]string, []string, error) {
-	roles, err := s.repo.FindActiveRoles(ctx, userID)
+func GetRoleAndPermissionCodes(ctx context.Context, repo Repository, userID uint64) ([]string, []string, error) {
+	roles, err := repo.FindActiveRoles(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}
-	entries, err := s.repo.FindUserPermission(ctx, userID)
+	entries, err := repo.FindUserPermission(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -71,8 +65,4 @@ func (s *Service) GetRoleAndPermissionCodes(ctx context.Context, userID uint64) 
 		}
 	}
 	return roleCodes, permissionCodes, nil
-}
-
-func (s *Service) ListUsers(ctx context.Context) ([]UserResponse, error) {
-	return s.repo.ListUsers(ctx)
 }

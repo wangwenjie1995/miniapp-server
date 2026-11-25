@@ -1,10 +1,12 @@
-package middleware
+package middleware_test
 
 import (
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"miniapp-server/internal/middleware"
 )
 
 func TestGetUserIDFromContext(t *testing.T) {
@@ -23,9 +25,9 @@ func TestGetUserIDFromContext(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _ := gin.CreateTestContext(httptest.NewRecorder())
 			if tc.set {
-				c.Set(userIDKey, tc.value)
+				c.Set("userID", tc.value)
 			}
-			id, ok := GetUserIDFromContext(c)
+			id, ok := middleware.GetUserIDFromContext(c)
 			if id != tc.wantID || ok != tc.wantOK {
 				t.Fatalf("GetUserIDFromContext() = %d, %v; want %d, %v", id, ok, tc.wantID, tc.wantOK)
 			}

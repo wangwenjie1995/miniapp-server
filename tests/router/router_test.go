@@ -22,7 +22,7 @@ func TestHealthAndRecovery(t *testing.T) {
 	// bytes.Buffer 是内存缓冲区；将日志写到这里，测试就可以读取并检查内容。
 	var logs bytes.Buffer
 	// 复用生产代码的路由创建函数，测试实际安装的中间件和健康接口。
-	router := router.NewWithDependencies(platform.Resources{Logger: slog.New(slog.NewJSONHandler(&logs, nil))}, router.Repositories{})
+	router := router.New(platform.Resources{Logger: slog.New(slog.NewJSONHandler(&logs, nil))})
 	// 这个故意 panic 的路由仅在当前测试实例中存在，不会暴露在正式服务里。
 	router.GET("/test-panic", func(c *gin.Context) { panic("test panic") })
 

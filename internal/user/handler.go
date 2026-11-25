@@ -2,30 +2,32 @@ package user
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 
+	"miniapp-server/internal/auth"
 	"miniapp-server/internal/middleware"
-	"miniapp-server/internal/platform"
 	"miniapp-server/internal/response"
 )
 
 type Handler struct {
-	service   *Service
-	resources platform.Resources
+	repo   Repository
+	logger *slog.Logger
+	tokens *auth.TokenManager
 }
 
-func NewHandler(service *Service, resources platform.Resources) *Handler {
-	return &Handler{service: service, resources: resources}
+func NewHandler(repo Repository, logger *slog.Logger, tokens *auth.TokenManager) *Handler {
+	return &Handler{repo: repo, logger: logger, tokens: tokens}
 }
 
 func (h *Handler) ListUsers(c *gin.Context) {
-	users, err := h.service.ListUsers(c.Request.Context())
+	users, err := h.repo.ListUsers(c.Request.Context())
 	if err != nil {
-		h.resources.Log().Error("获取用户列表失败", "error", err)
+		h.logger.Error("获取用户列表失败", "error", err)
 		response.ServerError(c, "获取用户列表失败")
 		return
 	}
@@ -43,13 +45,13 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.CreateUser(c.Request.Context(), req.Username, req.Password)
+	user, err := createUser(c.Request.Context(), h.repo, req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, ErrUsernameExists) {
 			response.Error(c, response.CodeUsernameExists, "用户名已存在，请更换用户名")
 			return
 		}
-		h.resources.Log().Error("用户注册失败", "error", err)
+		h.logger.Error("用户注册失败", "error", err)
 		response.ServerError(c, "注册失败")
 		return
 	}
@@ -66,31 +68,31 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.VerifyCredentials(c.Request.Context(), req.Username, req.Password)
+	user, err := verifyCredentials(c.Request.Context(), h.repo, req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
 			response.Error(c, response.CodeInvalidCredentials, "用户名或密码错误")
 			return
 		}
-		h.resources.Log().Error("用户登录失败", "error", err)
+		h.logger.Error("用户登录失败", "error", err)
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
-	tokens := h.resources.Tokens
+	tokens := h.tokens
 	if tokens == nil {
-		h.resources.Log().Error("未配置 Token 管理器")
+		h.logger.Error("未配置 Token 管理器")
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
 	token, expiresAt, err := tokens.Generate(user.ID)
 	if err != nil {
-		h.resources.Log().Error("生成token失败", "error", err)
+		h.logger.Error("生成token失败", "error", err)
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
-	roles, permissions, err := h.service.GetRoleAndPermissionCodes(c.Request.Context(), user.ID)
+	roles, permissions, err := GetRoleAndPermissionCodes(c.Request.Context(), h.repo, user.ID)
 	if err != nil {
-		h.resources.Log().Error("获取用户角色和权限失败", "error", err)
+		h.logger.Error("获取用户角色和权限失败", "error", err)
 		response.ServerError(c, "登录失败，请稍后重试")
 		return
 	}
@@ -116,7 +118,7 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.GetUserByID(c.Request.Context(), userID)
+	user, err := getUserByID(c.Request.Context(), h.repo, userID)
 
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
@@ -124,7 +126,7 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 			c.String(http.StatusUnauthorized, "请先登录或重新登录")
 			return
 		}
-		h.resources.Log().Error("获取用户信息失败", "error", err)
+		h.logger.Error("获取用户信息失败", "error", err)
 		response.ServerError(c, "获取用户信息失败，请稍后重试")
 		return
 	}

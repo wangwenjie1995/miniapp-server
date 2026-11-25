@@ -1,13 +1,17 @@
-package auth
+package auth_test
 
 import (
-	"github.com/golang-jwt/jwt/v5"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+
+	"miniapp-server/internal/auth"
 )
 
 func TestTokenRoundTrip(t *testing.T) {
-	manager := NewTokenManager([]byte("test-secret-at-least-32-bytes-long"), time.Hour)
+	secret := []byte("test-secret-at-least-32-bytes-long")
+	manager := auth.NewTokenManager(secret, time.Hour)
 	raw, expires, err := manager.Generate(42)
 	if err != nil {
 		t.Fatal(err)
@@ -17,7 +21,7 @@ func TestTokenRoundTrip(t *testing.T) {
 		t.Fatalf("id=%d err=%v", id, err)
 	}
 	claims := &jwt.RegisteredClaims{}
-	if _, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return manager.secret, nil }); err != nil {
+	if _, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return secret, nil }); err != nil {
 		t.Fatal(err)
 	}
 	if !expires.Equal(claims.ExpiresAt.Time) {
@@ -27,7 +31,7 @@ func TestTokenRoundTrip(t *testing.T) {
 
 func TestRejectInvalidTokens(t *testing.T) {
 	secret := []byte("test-secret-at-least-32-bytes-long")
-	manager := NewTokenManager(secret, time.Hour)
+	manager := auth.NewTokenManager(secret, time.Hour)
 	for _, tc := range []struct {
 		name, subject string
 		exp           *jwt.NumericDate
