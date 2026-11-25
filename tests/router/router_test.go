@@ -13,8 +13,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"miniapp-server/internal/platform"
+	"gorm.io/gorm"
+	"miniapp-server/internal/auth"
+	"miniapp-server/internal/global"
 	"miniapp-server/internal/router"
+	"sync"
 )
 
 // 一起验证健康检查、panic 恢复和日志，确保请求处理链能正常配合。
@@ -22,7 +25,7 @@ func TestHealthAndRecovery(t *testing.T) {
 	// bytes.Buffer 是内存缓冲区；将日志写到这里，测试就可以读取并检查内容。
 	var logs bytes.Buffer
 	// 复用生产代码的路由创建函数，测试实际安装的中间件和健康接口。
-	router := router.New(platform.Resources{Logger: slog.New(slog.NewJSONHandler(&logs, nil))})
+	router := newTestRouter(nil, nil, slog.New(slog.NewJSONHandler(&logs, nil)))
 	// 这个故意 panic 的路由仅在当前测试实例中存在，不会暴露在正式服务里。
 	router.GET("/test-panic", func(c *gin.Context) { panic("test panic") })
 
@@ -96,4 +99,18 @@ func TestHealthAndRecovery(t *testing.T) {
 	if requests != 3 || panics != 1 {
 		t.Fatalf("request logs = %d, panic logs = %d", requests, panics)
 	}
+}
+
+// 仅在构造路由时临时切换全局资源，返回的引擎持有本次测试的依赖。
+var routerInitMu sync.Mutex
+
+func newTestRouter(db *gorm.DB, tokens *auth.TokenManager, logger *slog.Logger) *gin.Engine {
+	routerInitMu.Lock()
+	defer routerInitMu.Unlock()
+	oldDB, oldTokens, oldLogger := global.DB, global.Tokens, global.Logger
+	defer func() {
+		global.DB, global.Tokens, global.Logger = oldDB, oldTokens, oldLogger
+	}()
+	global.DB, global.Tokens, global.Logger = db, tokens, logger
+	return router.New()
 }

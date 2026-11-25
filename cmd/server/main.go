@@ -16,7 +16,7 @@ import (
 	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
-	"miniapp-server/internal/platform"
+	"miniapp-server/internal/global"
 	"miniapp-server/internal/router"
 )
 
@@ -26,7 +26,8 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	// slog 是 Go 标准库的日志工具。JSONHandler 把日志转成 JSON，便于程序检索。
 	// os.Stdout 表示输出到终端；nil 表示使用默认选项，默认记录 INFO 及以上级别。
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	global.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(global.Logger)
 	// Go 通常通过返回 error 表示失败。nil 表示没有错误，非 nil 表示需要处理。
 	// 这里的 err 只在这个 if 语句及其代码块中有效。
 	if err := run(); err != nil {
@@ -58,10 +59,8 @@ func run() error {
 	}
 	// HTTP 服务完成优雅关闭后，才释放数据库连接池。
 	defer pool.Close()
-	resources := platform.Resources{
-		DB:     db,
-		Tokens: auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration),
-	}
-	handler := router.New(resources)
+	global.DB = db
+	global.Tokens = auth.NewTokenManager([]byte(cfg.JWT.Secret), cfg.JWT.Duration)
+	handler := router.New()
 	return app.New(cfg.HTTPAddr, handler).Run(ctx)
 }

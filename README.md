@@ -92,7 +92,7 @@ curl -i http://127.0.0.1:8081/healthz
 - `cmd/server`：启动入口、信号监听和退出码。
 - `internal/app`：HTTP 服务启动和优雅关闭。
 - `internal/router`：集中注册 Gin 路由、划分路由组并绑定中间件。
-- `internal/platform` 保存共享资源定义，启动时创建 DB 和 Token 管理器，组装模块时统一传入。
+- `internal/global` 保存共享数据库、Token 管理器和日志器。服务启动时完成初始化，随后调用 `router.New()` 注册路由。
 - `internal/config`：环境变量、本地私有配置读取及校验。
 - `internal/database`：MySQL 连接池、GORM 初始化和启动连接检查。
 - `migrations`、`cmd/dbinit`：首页版本化 SQL 迁移及显式初始化命令。

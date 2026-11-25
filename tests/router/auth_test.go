@@ -9,9 +9,6 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-
-	"miniapp-server/internal/platform"
-	"miniapp-server/internal/router"
 )
 
 func TestPublicRoutes(t *testing.T) {
@@ -25,7 +22,7 @@ func TestPublicRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { pool.Close() })
-	router := router.New(platform.Resources{DB: db, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Tokens: homeTestTokens()})
+	router := newTestRouter(db, homeTestTokens(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for _, tc := range []struct {
 		method, path string
 		status       int

@@ -3,14 +3,14 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
+	"miniapp-server/internal/global"
 	"miniapp-server/internal/middleware"
-	"miniapp-server/internal/platform"
 	"miniapp-server/internal/user"
 )
 
-func initUserRoutes(publicGroup, authenticatedGroup *gin.RouterGroup, resources platform.Resources) {
-	repo := user.NewRepository(resources.DB)
-	handler := user.NewHandler(repo, resources.Log(), resources.Tokens)
+func initUserRoutes(publicGroup, authenticatedGroup *gin.RouterGroup) {
+	repo := user.NewRepository(global.DB)
+	handler := user.NewHandler(repo, global.Logger, global.Tokens)
 	RegisterUserRoutes(publicGroup, authenticatedGroup, handler, repo)
 }
 

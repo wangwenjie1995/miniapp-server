@@ -16,7 +16,6 @@ import (
 	"miniapp-server/internal/auth"
 	"miniapp-server/internal/config"
 	"miniapp-server/internal/database"
-	"miniapp-server/internal/platform"
 	"miniapp-server/internal/router"
 	"miniapp-server/migrations"
 	"net/http"
@@ -238,7 +237,7 @@ func newHomeDB(t *testing.T) *gorm.DB {
 
 func newHomeRouter(t *testing.T) *gin.Engine {
 	t.Helper()
-	return router.New(platform.Resources{Tokens: homeTestTokens(), Logger: slog.New(slog.NewJSONHandler(io.Discard, nil)), DB: newHomeDB(t)})
+	return newTestRouter(newHomeDB(t), homeTestTokens(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
 }
 
 func homeRoutesWithRepository(repo home.Repository) *gin.Engine {
